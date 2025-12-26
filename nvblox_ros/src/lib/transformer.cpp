@@ -146,12 +146,12 @@ bool Transformer::lookupTransformQueue(const rclcpp::Time & timestamp, Transform
       return false;
     }
 
-    // If we're too far off on the timestamp:
-    uint64_t distance =
-      std::max(closest_match->first, timestamp_ns) - std::min(closest_match->first, timestamp_ns);
-    if (distance > timestamp_tolerance_ns_) {
-      return false;
-    }
+    // Timestamp tolerance check disabled for LiDAR-Camera fusion
+    // uint64_t distance =
+    //   std::max(closest_match->first, timestamp_ns) - std::min(closest_match->first, timestamp_ns);
+    // if (distance > timestamp_tolerance_ns_) {
+    //   return false;
+    // }
 
     // We just do nearest neighbor here.
     // TODO(holeynikova): add interpolation!
