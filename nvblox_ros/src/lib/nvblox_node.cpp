@@ -528,11 +528,10 @@ void NvbloxNode::colorImageCallback(
   const nvidia::isaac_ros::nitros::NitrosImage::ConstSharedPtr & color_image,
   const sensor_msgs::msg::CameraInfo::ConstSharedPtr & color_camera_info)
 {
-  const NitrosView & color_image_view = nvidia::isaac_ros::nitros::NitrosImageView(*color_image);
-  RCLCPP_INFO(get_logger(), "📷 [컬러1] 카메라 이미지 토픽 수신! 크기: %dx%d", 
-              color_image_view.GetWidth(), color_image_view.GetHeight());
   timing::Timer tick_timer("ros/color_image_callback");
   timing::Rates::tick("ros/color_image_callback");
+
+  const NitrosView & color_image_view = nvidia::isaac_ros::nitros::NitrosImageView(*color_image);
 
   timing::Delays::tick(
     "ros/color_image_callback",
@@ -549,8 +548,6 @@ void NvbloxNode::colorImageCallback(
 void NvbloxNode::pointcloudCallback(
   const sensor_msgs::msg::PointCloud2::ConstSharedPtr pointcloud)
 {
-  RCLCPP_INFO(get_logger(), "🔄 [라이다1] LiDAR 포인트클라우드 수신! 포인트 수: %d", 
-              pointcloud->width * pointcloud->height);
   timing::Timer tick_timer("ros/pointcloud_callback");
   timing::Rates::tick("ros/pointcloud_callback");
   const rclcpp::Time pointcloud_stamp(pointcloud->header.stamp.sec,
@@ -712,14 +709,8 @@ void NvbloxNode::processDepthQueue()
 
 void NvbloxNode::processColorQueue()
 {
-  RCLCPP_INFO(get_logger(), "🔄 [큐처리] 컬러 이미지 큐 처리 시작!");
-  
   auto message_ready = [this](const ImageTypeVariant & variant_msg) -> bool {
-      bool ready = this->isPoseAvailable(variant_msg);
-      if (!ready) {
-        RCLCPP_WARN(get_logger(), "⚠️ [큐처리] 컬러 이미지 TF 준비 안됨, 대기 중...");
-      }
-      return ready;
+      return this->isPoseAvailable(variant_msg);
     };
 
   auto process_image_msg = [this](const ImageTypeVariant & msg) -> bool {
@@ -1184,7 +1175,6 @@ void NvbloxNode::publishBackProjectedDepth(
 
 bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
 {
-  RCLCPP_INFO(get_logger(), "🎨 [컬러2] 컬러 이미지 처리 시작!");
   timing::Timer ros_color_timer("ros/color");
   timing::Timer transform_timer("ros/color/transform");
 
@@ -1205,13 +1195,10 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
     integrate_color_last_times_[color_frame] = rclcpp::Time(0, 0, RCL_ROS_TIME);
   }
   const rclcpp::Time last_color_image_timestamp = integrate_color_last_times_[color_frame];
-  RCLCPP_INFO(get_logger(), "🟠 [컬러3] 컬러 타임스탬프 체크 - 현재: %.3f, 주파수: %.2f Hz", 
-              color_image_timestamp.seconds(), static_cast<double>(params_.integrate_color_rate_hz));
   if (!shouldProcess(
       color_image_timestamp, last_color_image_timestamp,
       params_.integrate_color_rate_hz))
   {
-    RCLCPP_WARN(get_logger(), "🔴 [컬러3] 컬러 이미지 처리 주기 제한으로 버려짐!");
     // To discard we indicate that the image was processed, without actually integrating it.
     return true;
   }
@@ -1221,13 +1208,9 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
   }
   // Get the TF for this image.
   Transform T_L_C;
-  RCLCPP_INFO(get_logger(), "🔄 [컬러3] TF 변환 확인 중: %s → odom", color_frame.c_str());
   if (!transformer_.lookupTransformToGlobalFrame(color_frame, color_image_timestamp, &T_L_C)) {
-    RCLCPP_ERROR(get_logger(), "❌ [컬러3] TF 변환 실패! 프레임: %s, 시간: %.3f", 
-                 color_frame.c_str(), color_image_timestamp.seconds());
     return false;
   }
-  RCLCPP_INFO(get_logger(), "✅ [컬러3] TF 변환 성공!");
   Transform T_L_C_mask;
   if (mask_img_opt) {
     if (!transformer_.lookupTransformToGlobalFrame(mask_frame, mask_image_timestamp, &T_L_C_mask)) {
@@ -1264,16 +1247,12 @@ bool NvbloxNode::processColorImage(const ImageTypeVariant & color_msg)
   timing::Timer color_integrate_timer("ros/color/integrate");
   timing::Rates::tick("ros/color");
 
-  RCLCPP_INFO(get_logger(), "🔥 [퓨전4] 컬러-LiDAR 데이터 퓨전 시작!");
   if (mask_img_opt) {
-    RCLCPP_INFO(get_logger(), "🎭 [퓨전4] 마스크와 함께 컬러 통합");
     multi_mapper_->integrateColor(
       color_image_, mask_image_, T_L_C, color_camera);
   } else {
-    RCLCPP_INFO(get_logger(), "🎨 [퓨전4] 순수 컬러 데이터 통합");
     multi_mapper_->integrateColor(color_image_, T_L_C, color_camera);
   }
-  RCLCPP_INFO(get_logger(), "🎉 [퓨전4] 컬러-LiDAR 퓨전 완료! nvblox에 성공적으로 통합됨!");
 
   timing::Delays::tick(
     "ros/color_image_integration",
